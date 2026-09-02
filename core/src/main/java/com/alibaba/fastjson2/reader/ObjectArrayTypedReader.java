@@ -88,9 +88,11 @@ final class ObjectArrayTypedReader
                 // skip
             } else {
                 if (jsonReader.isSupportAutoType(features)) {
-                    ObjectReader autoTypeObjectReader = jsonReader.getObjectReaderAutoType(typeHash, objectClass, features);
+                    String typeName = jsonReader.getString();
+                    ObjectReader autoTypeObjectReader = jsonReader.getContext()
+                            .getObjectReaderAutoType(typeName, objectClass, features);
                     if (autoTypeObjectReader == null) {
-                        throw new JSONException(jsonReader.info("auotype not support : " + jsonReader.getString()));
+                        throw new JSONException(jsonReader.info("auotype not support : " + typeName));
                     }
 
                     return autoTypeObjectReader.readObject(jsonReader, fieldType, fieldName, features);
