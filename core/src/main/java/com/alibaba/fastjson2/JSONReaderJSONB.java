@@ -718,15 +718,11 @@ final class JSONReaderJSONB
                 );
             }
             case BC_TYPED_ANY: {
-                long typeHash = readTypeHashCode();
+                readTypeHashCode();
 
                 if (context.autoTypeBeforeHandler != null) {
-                    Class<?> filterClass = context.autoTypeBeforeHandler.apply(typeHash, null, context.features);
-
-                    if (filterClass == null) {
-                        String typeName = getString();
-                        filterClass = context.autoTypeBeforeHandler.apply(typeName, null, context.features);
-                    }
+                    String typeName = getString();
+                    Class<?> filterClass = context.autoTypeBeforeHandler.apply(typeName, null, context.features);
 
                     if (filterClass != null) {
                         ObjectReader autoTypeObjectReader = context.getObjectReader(filterClass);
@@ -747,14 +743,10 @@ final class JSONReaderJSONB
                     throw new JSONException("autoType not support , offset " + offset + "/" + bytes.length);
                 }
 
-                ObjectReader autoTypeObjectReader = context.getObjectReaderAutoType(typeHash);
+                String typeName = getString();
+                ObjectReader autoTypeObjectReader = context.getObjectReaderAutoType(typeName, null);
                 if (autoTypeObjectReader == null) {
-                    String typeName = getString();
-                    autoTypeObjectReader = context.getObjectReaderAutoType(typeName, null);
-
-                    if (autoTypeObjectReader == null) {
-                        throw new JSONException("autoType not support : " + typeName + ", offset " + offset + "/" + bytes.length);
-                    }
+                    throw new JSONException("autoType not support : " + typeName + ", offset " + offset + "/" + bytes.length);
                 }
                 return autoTypeObjectReader.readJSONBObject(this, null, null, 0);
             }
@@ -780,15 +772,11 @@ final class JSONReaderJSONB
                         long hash = readFieldNameHashCode();
 
                         if (hash == ObjectReader.HASH_TYPE) {
-                            long typeHash = readValueHashCode();
-                            ObjectReader autoTypeObjectReader = context.getObjectReaderAutoType(typeHash);
+                            readValueHashCode();
+                            String typeName = getString();
+                            ObjectReader autoTypeObjectReader = context.getObjectReaderAutoType(typeName, null);
                             if (autoTypeObjectReader == null) {
-                                String typeName = getString();
-                                autoTypeObjectReader = context.getObjectReaderAutoType(typeName, null);
-
-                                if (autoTypeObjectReader == null) {
-                                    throw new JSONException("auotype not support : " + typeName + ", offset " + offset + "/" + bytes.length);
-                                }
+                                throw new JSONException("auotype not support : " + typeName + ", offset " + offset + "/" + bytes.length);
                             }
 
                             typeRedirect = true;
@@ -1205,10 +1193,7 @@ final class JSONReaderJSONB
 
             AutoTypeBeforeHandler autoTypeBeforeHandler = context.autoTypeBeforeHandler;
             if (autoTypeBeforeHandler != null) {
-                Class<?> objectClass = autoTypeBeforeHandler.apply(typeHash, expectClass, features);
-                if (objectClass == null) {
-                    objectClass = autoTypeBeforeHandler.apply(getString(), expectClass, features);
-                }
+                Class<?> objectClass = autoTypeBeforeHandler.apply(getString(), expectClass, features);
                 if (objectClass != null) {
                     ObjectReader objectReader = context.getObjectReader(objectClass);
                     if (objectReader != null) {
@@ -1225,26 +1210,9 @@ final class JSONReaderJSONB
                 autoTypeError();
             }
 
-            autoTypeObjectReader = provider.getObjectReader(typeHash);
-
-            if (autoTypeObjectReader != null) {
-                Class objectClass = autoTypeObjectReader.getObjectClass();
-                if (objectClass != null) {
-                    ClassLoader classLoader = objectClass.getClassLoader();
-                    if (classLoader != null) {
-                        ClassLoader tcl = Thread.currentThread().getContextClassLoader();
-                        if (classLoader != tcl) {
-                            autoTypeObjectReader = getObjectReaderContext(autoTypeObjectReader, objectClass, tcl);
-                        }
-                    }
-                }
-            }
-
+            autoTypeObjectReader = provider.getObjectReader(getString(), expectClass, features2);
             if (autoTypeObjectReader == null) {
-                autoTypeObjectReader = provider.getObjectReader(getString(), expectClass, features2);
-                if (autoTypeObjectReader == null) {
-                    autoTypeError();
-                }
+                autoTypeError();
             }
 
             this.type = bytes[offset];
