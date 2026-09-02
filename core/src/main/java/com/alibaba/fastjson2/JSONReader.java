@@ -3599,6 +3599,14 @@ public abstract class JSONReader
             return provider;
         }
 
+        /**
+         * Returns an ObjectReader for the specified type hash code, or null if not found.
+         *
+         * @param hashCode The hash code of the type
+         * @return An ObjectReader for the specified type hash code, or null if not found
+         * @deprecated a hash hit is not an AutoType authorization; resolve by type name instead
+         */
+        @Deprecated
         public ObjectReader getObjectReaderAutoType(long hashCode) {
             return provider.getObjectReader(hashCode);
         }
@@ -4168,21 +4176,7 @@ public abstract class JSONReader
     }
 
     public ObjectReader getObjectReaderAutoType(long typeHash, Class expectClass, long features) {
-        ObjectReader autoTypeObjectReader = context.getObjectReaderAutoType(typeHash);
-        if (autoTypeObjectReader != null) {
-            return autoTypeObjectReader;
-        }
-
-        String typeName = getString();
-        if (context.autoTypeBeforeHandler != null) {
-            Class<?> autoTypeClass = context.autoTypeBeforeHandler.apply(typeName, expectClass, features);
-            if (autoTypeClass != null) {
-                boolean fieldBased = (features & Feature.FieldBased.mask) != 0;
-                return context.provider.getObjectReader(autoTypeClass, fieldBased);
-            }
-        }
-
-        return context.provider.getObjectReader(typeName, expectClass, context.features | features);
+        return context.getObjectReaderAutoType(getString(), expectClass, context.features | features);
     }
 
     public Byte readInt8() {
