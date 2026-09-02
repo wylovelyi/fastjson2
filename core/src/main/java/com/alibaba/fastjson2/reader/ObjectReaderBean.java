@@ -171,29 +171,26 @@ public abstract class ObjectReaderBean<T>
 
     public final ObjectReader checkAutoType(JSONReader jsonReader, Class expectClass, long features) {
         if (jsonReader.nextIfMatchTypedAny()) {
-            long typeHash = jsonReader.readTypeHashCode();
+            jsonReader.readTypeHashCode();
             JSONReader.Context context = jsonReader.context;
             long features3 = jsonReader.features(features | this.features);
             JSONReader.AutoTypeBeforeHandler autoTypeFilter = context.getContextAutoTypeBeforeHandler();
+            String typeName = jsonReader.getString();
             if (autoTypeFilter != null) {
-                Class<?> filterClass = autoTypeFilter.apply(typeHash, expectClass, features);
-                if (filterClass == null) {
-                    String typeName = jsonReader.getString();
-                    filterClass = autoTypeFilter.apply(typeName, expectClass, features);
+                Class<?> filterClass = autoTypeFilter.apply(typeName, expectClass, features);
 
-                    if (filterClass != null && !expectClass.isAssignableFrom(filterClass)) {
-                        if ((jsonReader.features(features) & IgnoreAutoTypeNotMatch.mask) == 0) {
-                            throw new JSONException("type not match. " + typeName + " -> " + expectClass.getName());
-                        }
-
-                        filterClass = expectClass;
+                if (filterClass != null && !expectClass.isAssignableFrom(filterClass)) {
+                    if ((jsonReader.features(features) & IgnoreAutoTypeNotMatch.mask) == 0) {
+                        throw new JSONException("type not match. " + typeName + " -> " + expectClass.getName());
                     }
+
+                    filterClass = expectClass;
                 }
 
                 return context.getObjectReader(filterClass);
             }
 
-            ObjectReader autoTypeObjectReader = jsonReader.getObjectReaderAutoType(typeHash, expectClass, features);
+            ObjectReader autoTypeObjectReader = context.getObjectReaderAutoType(typeName, expectClass, features3);
 
             if (autoTypeObjectReader == null) {
                 throw new JSONException(jsonReader.info("auotype not support"));
@@ -207,10 +204,10 @@ public abstract class ObjectReaderBean<T>
                     return context.getObjectReader(expectClass);
                 }
 
-                throw new JSONException("type not match. " + typeName + " -> " + expectClass.getName());
+                throw new JSONException("type not match. " + this.typeName + " -> " + expectClass.getName());
             }
 
-            if (typeHash == this.getTypeNameHash()) {
+            if (Fnv.hashCode64(typeName) == this.getTypeNameHash()) {
                 return this;
             }
 
@@ -319,24 +316,16 @@ public abstract class ObjectReaderBean<T>
             ) {
                 ObjectReader reader = null;
 
-                long typeHash = jsonReader.readTypeHashCode();
+                jsonReader.readTypeHashCode();
+                String typeName = jsonReader.getString();
                 if (autoTypeFilter != null) {
-                    Class<?> filterClass = autoTypeFilter.apply(typeHash, objectClass, features3);
-                    if (filterClass == null) {
-                        filterClass = autoTypeFilter.apply(jsonReader.getString(), objectClass, features3);
-                        if (filterClass != null) {
-                            reader = context.getObjectReader(filterClass);
-                        }
+                    Class<?> filterClass = autoTypeFilter.apply(typeName, objectClass, features3);
+                    if (filterClass != null) {
+                        reader = context.getObjectReader(filterClass);
                     }
                 }
 
                 if (reader == null) {
-                    reader = autoType(context, typeHash);
-                }
-
-                String typeName = null;
-                if (reader == null) {
-                    typeName = jsonReader.getString();
                     reader = context.getObjectReaderAutoType(
                             typeName, objectClass, features3
                     );
