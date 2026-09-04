@@ -687,7 +687,15 @@ public class ObjectWriterAdapter<T>
                 }
                 if (valueWriter instanceof ObjectWriterAdapter) {
                     ObjectWriterAdapter objectWriterAdapter = (ObjectWriterAdapter) valueWriter;
-                    if (!objectWriterAdapter.getFieldWriters().isEmpty()) {
+                    // issue #7853
+                    // The initWriter may have been cached for a different generic argument
+                    // (e.g. the first call serialized ResponseResult<PagerDataBean<String>>,
+                    // a later call serializes ResponseResult<Boolean>).
+                    // Only reuse it when the runtime value class matches, otherwise
+                    // convert the value generically to avoid a ClassCastException.
+                    if (objectWriterAdapter.objectClass.isAssignableFrom(fieldValue.getClass())
+                            && !objectWriterAdapter.getFieldWriters().isEmpty()
+                    ) {
                         fieldValue = objectWriterAdapter.toJSONObject(fieldValue);
                     } else {
                         fieldValue = JSON.toJSON(fieldValue);
