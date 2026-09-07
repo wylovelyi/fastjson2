@@ -171,6 +171,22 @@ public abstract class JSON
         return context;
     }
 
+    /**
+     * Build a {@link JSONReader.Context} bound to the given {@link ParserConfig}'s provider.
+     * When {@link ParserConfig#isAutoTypeSupport()} is enabled, the fastjson 1.x compatible
+     * semantic of {@code @type} auto-resolution is honored by enabling
+     * {@link JSONReader.Feature#SupportAutoType} on the context, so that {@code JSON.parse} /
+     * {@code JSON.parseObject} with a {@link ParserConfig} that has autoType support enabled
+     * resolves {@code @type} just like fastjson 1.x.
+     */
+    public static JSONReader.Context createReadContext(ParserConfig config, int featuresValue, Feature... features) {
+        JSONReader.Context context = createReadContext(config.getProvider(), featuresValue, features);
+        if (config.isAutoTypeSupport()) {
+            context.config(JSONReader.Feature.SupportAutoType);
+        }
+        return context;
+    }
+
     public static JSONObject parseObject(String str) {
         if (str == null || str.isEmpty()) {
             return null;
@@ -265,7 +281,7 @@ public abstract class JSON
         }
 
         JSONReader.Context context = createReadContext(
-                config.getProvider(),
+                config,
                 featureValues,
                 features
         );
@@ -313,7 +329,7 @@ public abstract class JSON
         }
 
         JSONReader.Context context = createReadContext(
-                config.getProvider(),
+                config,
                 featureValues,
                 features
         );
@@ -420,7 +436,7 @@ public abstract class JSON
         }
 
         JSONReader.Context context = createReadContext(
-                config.getProvider(),
+                config,
                 featureValues,
                 features
         );
@@ -626,7 +642,7 @@ public abstract class JSON
         }
 
         JSONReader.Context context = createReadContext(
-                config.getProvider(),
+                config,
                 DEFAULT_PARSER_FEATURE,
                 features
         );
@@ -688,7 +704,7 @@ public abstract class JSON
         }
 
         JSONReader.Context context = createReadContext(
-                config.getProvider(),
+                config,
                 featureValues,
                 features
         );
@@ -979,7 +995,7 @@ public abstract class JSON
             return null;
         }
 
-        JSONReader.Context context = createReadContext(config.getProvider(), DEFAULT_PARSER_FEATURE, features);
+        JSONReader.Context context = createReadContext(config, DEFAULT_PARSER_FEATURE, features);
         try (JSONReader jsonReader = JSONReader.of(str, context)) {
             Object object;
             if (jsonReader.isObject() && !jsonReader.isSupportAutoType(0)) {
@@ -1001,7 +1017,7 @@ public abstract class JSON
             return null;
         }
 
-        JSONReader.Context context = createReadContext(config.getProvider(), DEFAULT_PARSER_FEATURE);
+        JSONReader.Context context = createReadContext(config, DEFAULT_PARSER_FEATURE);
         try (JSONReader jsonReader = JSONReader.of(str, context)) {
             Object object;
             if (jsonReader.isObject() && !jsonReader.isSupportAutoType(0)) {
@@ -1023,7 +1039,7 @@ public abstract class JSON
             return null;
         }
 
-        JSONReader.Context context = createReadContext(config.getProvider(), features);
+        JSONReader.Context context = createReadContext(config, features);
         try (JSONReader jsonReader = JSONReader.of(str, context)) {
             Object object;
             if (jsonReader.isObject() && !jsonReader.isSupportAutoType(0)) {
@@ -2230,7 +2246,7 @@ public abstract class JSON
 
         try (JSONReader reader = JSONReader.of(
                 text,
-                createReadContext(config.getProvider(), DEFAULT_PARSER_FEATURE))
+                createReadContext(config, DEFAULT_PARSER_FEATURE))
         ) {
             List<T> list = reader.read(paramType);
             reader.handleResolveTasks(list);
