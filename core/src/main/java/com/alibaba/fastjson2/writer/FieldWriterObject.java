@@ -69,6 +69,29 @@ public class FieldWriterObject<T>
     }
 
     @Override
+    public ObjectWriter getInitWriter(Class valueClass) {
+        ObjectWriter initWriter = this.initObjectWriter;
+        if (initWriter == null || initWriter == ObjectWriterBaseModule.VoidObjectWriter.INSTANCE) {
+            return null;
+        }
+
+        if (valueClass == null) {
+            return initWriter;
+        }
+
+        Class initValueClass = this.initValueClass;
+        if (initValueClass == null) {
+            return null;
+        }
+
+        // issue #7853 : the cached writer was resolved for initValueClass, so it may only be
+        // reused for values of that class. Reusing it for an unrelated class makes the value
+        // be read through foreign field writers, which throws ClassCastException (or, depending
+        // on the JDK, crashes the VM).
+        return typeMatch(initValueClass, valueClass, writeUsing) ? initWriter : null;
+    }
+
+    @Override
     public boolean unwrapped() {
         return unwrapped;
     }
@@ -79,13 +102,7 @@ public class FieldWriterObject<T>
         if (initValueClass == null || initObjectWriter == ObjectWriterBaseModule.VoidObjectWriter.INSTANCE) {
             return getObjectWriterVoid(jsonWriter, valueClass);
         } else {
-            boolean typeMatch = initValueClass == valueClass
-                    || (writeUsing && initValueClass.isAssignableFrom(valueClass))
-                    || (initValueClass == Map.class && initValueClass.isAssignableFrom(valueClass))
-                    || (initValueClass == List.class && initValueClass.isAssignableFrom(valueClass));
-            if (!typeMatch && initValueClass.isPrimitive()) {
-                typeMatch = typeMatch(initValueClass, valueClass);
-            }
+            boolean typeMatch = typeMatch(initValueClass, valueClass, writeUsing);
 
             if (typeMatch) {
                 ObjectWriter objectWriter;
@@ -168,6 +185,17 @@ public class FieldWriterObject<T>
             }
         }
         return formattedWriter;
+    }
+
+    static boolean typeMatch(Class initValueClass, Class valueClass, boolean writeUsing) {
+        boolean typeMatch = initValueClass == valueClass
+                || (writeUsing && initValueClass.isAssignableFrom(valueClass))
+                || (initValueClass == Map.class && initValueClass.isAssignableFrom(valueClass))
+                || (initValueClass == List.class && initValueClass.isAssignableFrom(valueClass));
+        if (!typeMatch && initValueClass.isPrimitive()) {
+            typeMatch = typeMatch(initValueClass, valueClass);
+        }
+        return typeMatch;
     }
 
     static boolean typeMatch(Class initValueClass, Class valueClass) {
