@@ -250,6 +250,17 @@ public abstract class FieldWriter<T>
         return null;
     }
 
+    /**
+     * Returns the writer cached for this field when it can be used for values of the given class,
+     * or null when it cannot (for example because the cached writer was resolved for a different
+     * class). Callers may then resolve a writer from the runtime class instead.
+     *
+     * @param valueClass runtime class of the value about to be written, may be null
+     */
+    public ObjectWriter getInitWriter(Class valueClass) {
+        return getInitWriter();
+    }
+
     public boolean unwrapped() {
         return false;
     }

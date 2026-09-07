@@ -639,9 +639,11 @@ public class ObjectWriterAdapter<T>
                     continue;
                 }
 
-                ObjectWriter fieldObjectWriter = fieldWriter.getInitWriter();
+                ObjectWriter fieldObjectWriter = fieldWriter.getInitWriter(
+                        fieldValue == null ? null : fieldValue.getClass());
                 if (fieldObjectWriter == null) {
-                    fieldObjectWriter = JSONFactory.getDefaultObjectWriterProvider().getObjectWriter(fieldClass);
+                    fieldObjectWriter = JSONFactory.getDefaultObjectWriterProvider()
+                            .getObjectWriter(fieldValue == null ? fieldClass : fieldValue.getClass());
                 }
                 List<FieldWriter> unwrappedFieldWriters = fieldObjectWriter.getFieldWriters();
                 for (int j = 0, unwrappedSize = unwrappedFieldWriters.size(); j < unwrappedSize; j++) {
@@ -681,22 +683,31 @@ public class ObjectWriterAdapter<T>
                 }
             }
             if (fieldWriter instanceof FieldWriterObject && fieldValue != null && !(fieldValue instanceof Map)) {
-                ObjectWriter valueWriter = fieldWriter.getInitWriter();
-                if (valueWriter == null) {
-                    valueWriter = JSONFactory.getObjectWriter(fieldWriter.fieldType, this.features | features);
-                }
-                if (valueWriter instanceof ObjectWriterAdapter) {
-                    ObjectWriterAdapter objectWriterAdapter = (ObjectWriterAdapter) valueWriter;
-                    // issue #7853
-                    // The initWriter may have been cached for a different generic argument
-                    // (e.g. the first call serialized ResponseResult<PagerDataBean<String>>,
-                    // a later call serializes ResponseResult<Boolean>).
-                    // Only reuse it when the runtime value class matches, otherwise
-                    // convert the value generically to avoid a ClassCastException.
-                    if (objectWriterAdapter.objectClass.isAssignableFrom(fieldValue.getClass())
-                            && !objectWriterAdapter.getFieldWriters().isEmpty()
+                Class<?> valueClass = fieldValue.getClass();
+                ObjectWriter valueWriter = fieldWriter.getInitWriter(valueClass);
+                if (valueWriter != null) {
+                    // the cached writer was resolved for this value class, so it can be reused
+                    if (valueWriter instanceof ObjectWriterAdapter) {
+                        ObjectWriterAdapter objectWriterAdapter = (ObjectWriterAdapter) valueWriter;
+                        if (objectWriterAdapter.getFieldWriters().isEmpty()) {
+                            fieldValue = JSON.toJSON(fieldValue);
+                        } else {
+                            fieldValue = objectWriterAdapter.toJSONObject(fieldValue);
+                        }
+                    }
+                } else {
+                    // issue #7853 : no writer is cached for this value class. That happens when the
+                    // cached one belongs to another generic argument - the field was first serialized
+                    // as ResponseResult<PagerDataBean> and is now serialized as ResponseResult<Boolean>,
+                    // or the other way round. Reusing the cached writer would read the value through
+                    // foreign field writers and throw a ClassCastException, so resolve the writer from
+                    // the runtime class instead. Note the cached writer is never repaired here: it is
+                    // written once by compareAndSet, so a mismatch is a stable state.
+                    ObjectWriter runtimeWriter = JSONFactory.getObjectWriter(valueClass, this.features | features);
+                    if (runtimeWriter instanceof ObjectWriterAdapter
+                            && !((ObjectWriterAdapter) runtimeWriter).getFieldWriters().isEmpty()
                     ) {
-                        fieldValue = objectWriterAdapter.toJSONObject(fieldValue);
+                        fieldValue = ((ObjectWriterAdapter) runtimeWriter).toJSONObject(fieldValue);
                     } else {
                         fieldValue = JSON.toJSON(fieldValue);
                     }
