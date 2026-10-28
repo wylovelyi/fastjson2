@@ -179,19 +179,24 @@ public abstract class JSON
      * with an autoType-supporting {@link ParserConfig} resolve {@code @type}.
      * <p>
      * <strong>This restores fastjson 1.x auto type semantics, which are broader than fastjson2's
-     * default.</strong> Once {@code JSONReader.Feature.SupportAutoType} is on,
-     * {@code ObjectReaderProvider#checkAutoType} consults the accept (allow) list built from
-     * {@code ParserConfig.addAccept} first, but that list is a fast path and not a security
-     * boundary: when no accept entry matches, the requested type is still resolved by name via
-     * {@code TypeUtils.getMapping} / class loading, and only
-     * {@code JDKUtils.isAutoTypeDenyClass} (fastjson2's built-in JDK gadget denylist) rejects it.
-     * A type is also rejected when its name is 192 characters or longer, contains illegal
-     * characters, or is incompatible with the {@code expectClass} supplied by the caller.
+     * default.</strong> Once {@code JSONReader.Feature.SupportAutoType} is on, resolution does
+     * <em>not</em> require the accept list: {@code ObjectReaderProvider#checkAutoType} scans
+     * {@code ParserConfig.addAccept} as a fast path only, and a miss still resolves the requested
+     * type by name through {@code TypeUtils.getMapping} / class loading. The built-in gates are
+     * {@code SAFE_MODE} (rejects everything), a type name of 192 characters or more, illegal
+     * characters in the name, {@code expectClass} incompatibility when a target type is supplied,
+     * and {@code JDKUtils.isAutoTypeDenyClass}, which covers exactly two categories:
+     * {@code ClassLoader} subtypes and JDBC {@code DataSource} / {@code RowSet} implementations.
+     * Any other class that loads is instantiable from an input supplied {@code @type}.
+     * <p>
+     * {@code addAccept} is therefore a fast path and a hardening recommendation, not a
+     * restriction; callers that need a strict allowlist should install a
+     * {@code ParserConfig.AutoTypeCheckHandler} instead.
      * <p>
      * The deprecated fastjson 1.x {@code ParserConfig.addDeny} denylist is <em>not</em> enforced:
      * {@code ObjectReaderProvider.addAutoTypeDeny} is a deprecated no-op in fastjson2, so callers
-     * that relied on a deny list have no equivalent protection here and must migrate to
-     * {@code addAccept} or an {@code AutoTypeBeforeHandler}.
+     * that relied on a deny list have no equivalent protection here. {@code addDeny} now documents
+     * and warns about this at configuration time.
      * <p>
      * {@code ObjectReaderProvider.SAFE_MODE} still makes {@code checkAutoType} return {@code null}
      * before the accept list or the class-loading fallback is reached, so enabling auto type support
@@ -202,13 +207,14 @@ public abstract class JSON
         for (Feature feature : features) {
             featuresValue |= feature.mask;
         }
-        JSONReader.Context context = createReadContext(config.getProvider(), featuresValue, features);
         // Honour ParserConfig.autoTypeSupport only when the caller has not explicitly
         // suppressed @type resolution for this call (fastjson 1.x Feature.IgnoreAutoType).
+        // Folding the bit in before delegating keeps the mapping to JSONReader.Feature in
+        // createReadContext(ObjectReaderProvider, int, Feature...) as the only one.
         if (config.isAutoTypeSupport() && (featuresValue & Feature.IgnoreAutoType.mask) == 0) {
-            context.config(JSONReader.Feature.SupportAutoType);
+            featuresValue |= Feature.SupportAutoType.mask;
         }
-        return context;
+        return createReadContext(config.getProvider(), featuresValue, features);
     }
 
     public static JSONObject parseObject(String str) {
