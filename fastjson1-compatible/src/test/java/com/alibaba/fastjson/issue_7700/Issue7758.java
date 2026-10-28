@@ -45,7 +45,7 @@ public class Issue7758 {
         Object o = JSON.parse(json, config);
 
         assertNotNull(o);
-        assertTrue("expected Session but got " + o.getClass(), o instanceof Session);
+        assertTrue(o instanceof Session, "expected Session but got " + o.getClass());
         assertEquals("session-001", ((Session) o).getId());
         assertEquals("127.0.0.1", ((Session) o).getHost());
     }
@@ -62,6 +62,6 @@ public class Issue7758 {
         Object o = JSON.parse(json, config);
 
         // Without autoTypeSupport, @type must be ignored and a plain JSONObject returned.
-        assertTrue("expected JSONObject but got " + o.getClass(), o instanceof JSONObject);
+        assertTrue(o instanceof JSONObject, "expected JSONObject but got " + o.getClass());
     }
 }
