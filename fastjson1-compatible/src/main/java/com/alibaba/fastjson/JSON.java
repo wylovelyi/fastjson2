@@ -178,13 +178,25 @@ public abstract class JSON
      * {@link JSONReader.Feature#SupportAutoType} so that {@code JSON.parse} / {@code JSON.parseObject}
      * with an autoType-supporting {@link ParserConfig} resolve {@code @type}.
      * <p>
-     * Resolution follows fastjson2's {@code SupportAutoType} semantics: the accept (allow) list
-     * ({@code ParserConfig.addAccept}) plus fastjson2's built-in JDK gadget denylist
-     * ({@code JDKUtils.isAutoTypeDenyClass}). The deprecated fastjson 1.x
-     * {@code ParserConfig.addDeny} denylist is <em>not</em> enforced here &mdash; in fastjson2
-     * {@code ObjectReaderProvider.addAutoTypeDeny} is a deprecated no-op and {@code checkAutoType}
-     * does not consult a user denylist, by design (fastjson2's security model is allowlist-based).
-     * Migrators that relied on a deny list should move to {@code addAccept}.
+     * <strong>This restores fastjson 1.x auto type semantics, which are broader than fastjson2's
+     * default.</strong> Once {@code JSONReader.Feature.SupportAutoType} is on,
+     * {@code ObjectReaderProvider#checkAutoType} consults the accept (allow) list built from
+     * {@code ParserConfig.addAccept} first, but that list is a fast path and not a security
+     * boundary: when no accept entry matches, the requested type is still resolved by name via
+     * {@code TypeUtils.getMapping} / class loading, and only
+     * {@code JDKUtils.isAutoTypeDenyClass} (fastjson2's built-in JDK gadget denylist) rejects it.
+     * A type is also rejected when its name is 192 characters or longer, contains illegal
+     * characters, or is incompatible with the {@code expectClass} supplied by the caller.
+     * <p>
+     * The deprecated fastjson 1.x {@code ParserConfig.addDeny} denylist is <em>not</em> enforced:
+     * {@code ObjectReaderProvider.addAutoTypeDeny} is a deprecated no-op in fastjson2, so callers
+     * that relied on a deny list have no equivalent protection here and must migrate to
+     * {@code addAccept} or an {@code AutoTypeBeforeHandler}.
+     * <p>
+     * {@code ObjectReaderProvider.SAFE_MODE} still makes {@code checkAutoType} return {@code null}
+     * before the accept list or the class-loading fallback is reached, so enabling auto type support
+     * here cannot bypass safe mode. (As everywhere else, a registered
+     * {@code AutoTypeBeforeHandler} is consulted before the safe mode check.)
      */
     public static JSONReader.Context createReadContext(ParserConfig config, int featuresValue, Feature... features) {
         for (Feature feature : features) {
